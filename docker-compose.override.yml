@@ -1,0 +1,60 @@
+services:
+  netbox:
+    env_file: .env
+    restart: ${RESTART_NETBOX:-unless-stopped}
+    volumes:
+      - ${DIR_PERSIST}/configuration/extra.py:/etc/netbox/config/extra.py:z,ro
+      - ${DIR_PERSIST}/configuration/ldap/extra.py:/etc/netbox/config/ldap/extra.py:z,ro
+      - ${DIR_PERSIST}/files/media:/opt/netbox/netbox/media:rw
+      - ${DIR_PERSIST}/files/reports:/opt/netbox/netbox/reports:rw
+      - ${DIR_PERSIST}/files/scripts:/opt/netbox/netbox/scripts:rw
+    networks:
+      - br-proxy
+      - backend
+    labels:
+      traefik.enable: true
+
+      traefik.http.routers.netbox.rule: Host(`${SITE_HOST:-netbox}.${DOMAIN:-s811.net}`)
+      traefik.http.routers.netbox.entrypoints: ${TRAEFIK_ENTRYPOINTS:-https-443}
+      traefik.http.routers.netbox.tls.certresolver: ${TRAEFIK_CERTRESOLVER:-lets-encrypt}
+      traefik.http.routers.netbox.service: netbox
+      traefik.http.services.netbox.loadbalancer.server.port: 8080
+  netbox-worker:
+    restart: ${RESTART_NETBOX_WORKER:-unless-stopped}
+    networks:
+      - backend
+  postgres:
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USER}
+    restart: ${RESTART_POSTGRES:-unless-stopped}
+    volumes:
+      - ${DIR_PERSIST}/postgres:/var/lib/postgresql
+    networks:
+      - backend
+  redis:
+    env_file: .env
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    restart: ${RESTART_REDIS:-unless-stopped}
+    volumes:
+      - ${DIR_PERSIST}/redis:/data
+    networks:
+      - backend
+  redis-cache:
+    env_file: .env
+    environment:
+      REDIS_PASSWORD: ${REDIS_CACHE_PASSWORD}
+    restart: ${RESTART_REDIS_CACHE:-unless-stopped}
+    volumes:
+      - ${DIR_PERSIST}/redis-cache:/data
+    networks:
+      - backend
+
+networks:
+  br-proxy:
+    external: true
+  backend:
+    driver: bridge
